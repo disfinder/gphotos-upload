@@ -44,6 +44,8 @@ def parse_args(arg_input=None):
     parser.add_argument('-v', '--verbose', action='count', default=0, help='verbosity level, up to -vvv')
     parser.add_argument('-n', '--dry-run', dest='dry_run', required=False, action='store_true',
                         help='not make actual changes, just dry-run')
+    parser.add_argument('-l', '--long-names', dest='long_names', required=False, action='store_true',
+                        help='Make long album names if true or short (last folder name) if false')
 
     # group_common.add_argument('--no-progress', action='store_true', dest='progressbar_disabled',
     #                           help='Progressbar disabled.')
@@ -246,8 +248,13 @@ def main(args):
     for path, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs', leave=False):
         logging.info('Root: {}'.format(path))
         if files:
-            # _, album_name = os.path.split(path)
-            album_name = path.rpartition(os.path.commonpath([root_dir, path]))[2][1:]
+            if args.long_names:
+                # use full path after root folder as album name, for example - some/second/level
+                _, _, album_name = path.rpartition(os.path.commonpath([root_dir, path]))
+                # trim first symbol (/) from album name
+                album_name = album_name[1:]
+            else:
+                _, album_name = os.path.split(path)
 
             if album_name in args.excludes:
                 logging.info('SKIP album name: {}'.format(album_name))
