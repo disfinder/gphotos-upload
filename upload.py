@@ -23,7 +23,7 @@ def parse_args(arg_input=None):
     parser = argparse.ArgumentParser(description='Upload photos to Google Photos.')
     parser.add_argument('--auth ', metavar='auth_file', dest='auth_file', default='client_id.json',
                         help='file for reading/storing user authentication tokens')
-g    parser.add_argument('root_dir', metavar='root_dir',
+    parser.add_argument('root_dir', metavar='root_dir',
                         help='Root directory with subfolders to process.')
     return parser.parse_args(arg_input)
 
@@ -133,7 +133,12 @@ def create_or_retrieve_album(session, album_title):
         return None
 
 
-def upload_photos(session, photo_file_list, album_name):
+def upload_photos(session, path, photo_file_list, album_name):
+    # return
+    # for photo_file_name in tqdm(photo_file_list, desc='Files'):
+    #     logging.debug('Album: {} \tFile: {}'.format(album_name,photo_file_name))
+    # return
+
     album_id = create_or_retrieve_album(session, album_name) if album_name else None
 
     # interrupt upload if an upload was requested but could not be created
@@ -143,10 +148,10 @@ def upload_photos(session, photo_file_list, album_name):
     session.headers["Content-type"] = "application/octet-stream"
     session.headers["X-Goog-Upload-Protocol"] = "raw"
 
-    for photo_file_name in photo_file_list:
+    for photo_file_name in tqdm(photo_file_list, desc='Files'):
 
         try:
-            photo_file = open(photo_file_name, mode='rb')
+            photo_file = open("{}/{}".format(path,photo_file_name), mode='rb')
             photo_bytes = photo_file.read()
         except OSError as err:
             logging.error("Could not read file \'{0}\' -- {1}".format(photo_file_name, err))
@@ -206,6 +211,7 @@ def main(args):
         exit(0)
 
     logging.debug('Creating session for upload...')
+    session=None
     session = get_authorized_session(args.auth_file)
 
     for root, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs'):
@@ -213,10 +219,8 @@ def main(args):
         if files:
             _, album_name = os.path.split(root)
             logging.debug('Album name: {}'.format(album_name))
+            upload_photos(session, root, files, album_name)
 
-            # upload_photos(session, files, args.album_name)
-
-            logging.debug('some files')
     return
 
 
