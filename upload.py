@@ -9,6 +9,8 @@ from tqdm import tqdm
 import sys
 from time import sleep
 
+REPORT = []
+
 
 class TqdmHandler(logging.StreamHandler):
     def __init__(self):
@@ -21,14 +23,19 @@ class TqdmHandler(logging.StreamHandler):
 
 def parse_args(arg_input=None):
     parser = argparse.ArgumentParser(description='Upload photos to Google Photos.')
+    file_group = parser.add_argument_group()
+    file_group.add_argument('root_dir', metavar='root_dir',
+                            help='Root directory with subfolders to process.')
+    file_group.add_argument('-e', '--extention', dest='extentions', required=False, action='append',
+                            default=['jpg', 'mp4'],
+                            help='Specify extentions to proceed, other will skipped. Case-insensitive. Can be repeated.')
+
     parser.add_argument('--auth ', metavar='auth_file', dest='auth_file', default='client_id.json',
                         help='file for reading/storing user authentication tokens')
-    parser.add_argument('root_dir', metavar='root_dir',
-                        help='Root directory with subfolders to process.')
 
     parser.add_argument('-v', '--verbose', action='count', default=0, help='verbosity level, up to -vvv')
     parser.add_argument('-n', '--dry-run', dest='dry_run', required=False, action='store_true',
-                             help='not make actual changes, just dry-run')
+                        help='not make actual changes, just dry-run')
 
     # group_common.add_argument('--no-progress', action='store_true', dest='progressbar_disabled',
     #                           help='Progressbar disabled.')
@@ -143,8 +150,8 @@ def create_or_retrieve_album(session, album_title):
         return None
 
 
-def upload_photos(session, path, photo_file_list, album_name, dry_run):
-    if not dry_run:
+def upload_photos(session, path, photo_file_list, album_name, args):
+    if not args.dry_run:
         album_id = create_or_retrieve_album(session, album_name) if album_name else None
         # interrupt upload if an upload was requested but could not be created
         if album_name and not album_id:
@@ -152,15 +159,20 @@ def upload_photos(session, path, photo_file_list, album_name, dry_run):
 
     session.headers["Content-type"] = "application/octet-stream"
     session.headers["X-Goog-Upload-Protocol"] = "raw"
-
     for photo_file_name in tqdm(photo_file_list, desc='Files', leave=False):
-        logging.info('Path: {}, file: {}'.format(path, photo_file_name))
-        if dry_run:
-            sleep(0.5)
+        filename, extention = os.path.splitext(photo_file_name)
+        if extention[1:].lower() in args.extentions:
+
+            logging.info('Path: {}, file: {}'.format(path, photo_file_name))
+        else:
+            logging.info('SKIP: {}, file: {}, because extention: {}'.format(path, photo_file_name, extention))
+            continue
+        if args.dry_run:
+            sleep(0.1)
             continue
 
         try:
-            photo_file = open("{}/{}".format(path,photo_file_name), mode='rb')
+            photo_file = open("{}/{}".format(path, photo_file_name), mode='rb')
             photo_bytes = photo_file.read()
         except OSError as err:
             logging.error("Could not read file \'{0}\' -- {1}".format(photo_file_name, err))
@@ -215,7 +227,7 @@ def main(args):
     filecounter = 0
     for _ in os.walk(root_dir):
         filecounter += 1
-    if filecounter==0:
+    if filecounter == 0:
         logging.warning('No files to upload.')
         exit(0)
 
@@ -227,8 +239,7 @@ def main(args):
         if files:
             _, album_name = os.path.split(path)
             logging.info('Album name: {}'.format(album_name))
-            upload_photos(session, path, files, album_name, args.dry_run)
-
+            upload_photos(session, path, files, album_name, args)
 
     # As a quick status check, dump the aglbums and their key attributes
     print("{:<60} | {:>8} | {} ".format("PHOTO ALBUM", "# PHOTOS", "IS WRITEABLE?"))
