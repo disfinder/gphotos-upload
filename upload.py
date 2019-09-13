@@ -6,6 +6,8 @@ import os.path
 import argparse
 import logging
 from tqdm import tqdm
+import sys
+from time import sleep
 
 
 class TqdmHandler(logging.StreamHandler):
@@ -198,14 +200,7 @@ def upload_photos(session, photo_file_list, album_name):
         pass
 
 
-def main():
-    args = parse_args()
-
-    logging.basicConfig(format='%(asctime)s %(module)s.%(funcName)s:%(levelname)s:%(message)s',
-                        datefmt='%m/%d/%Y %I_%M_%S %p',
-                        filename=args.log_file,
-                        level=logging.INFO)
-
+def main(args):
     session = get_authorized_session(args.auth_file)
 
     upload_photos(session, args.photos, args.album_name)
@@ -220,4 +215,12 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+
+    tqdm_handler = TqdmHandler()
+    tqdm_handler.setLevel('DEBUG')
+    logging.basicConfig(format='%(asctime)s - %(levelname)8s - %(name)s - %(message)s',
+                        # filename=args.log_file,
+                        level=logging.DEBUG,
+                        handlers=[tqdm_handler])
+    main(args)
