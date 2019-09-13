@@ -8,8 +8,9 @@ import logging
 from tqdm import tqdm
 import sys
 from time import sleep
+from collections import defaultdict
 
-REPORT = []
+REPORT = defaultdict(int)
 
 
 class TqdmHandler(logging.StreamHandler):
@@ -26,9 +27,12 @@ def parse_args(arg_input=None):
     file_group = parser.add_argument_group()
     file_group.add_argument('root_dir', metavar='root_dir',
                             help='Root directory with subfolders to process.')
-    file_group.add_argument('-e', '--extention', dest='extentions', required=False, action='append',
+    file_group.add_argument('-t', '--extension', dest='extensions', required=False, action='append',
                             default=['jpg', 'mp4'],
-                            help='Specify extentions to proceed, other will skipped. Case-insensitive. Can be repeated.')
+                            help='Specify extension to proceed, other will skipped. Case-insensitive. Can be repeated.')
+    file_group.add_argument('-e', '--exclude', dest='excludes', required=False, action='append',
+                            default=['.thumbnails', '.picasaoriginals'],
+                            help='Specify folders to exclude')
 
     parser.add_argument('--auth ', metavar='auth_file', dest='auth_file', default='client_id.json',
                         help='file for reading/storing user authentication tokens')
@@ -160,15 +164,16 @@ def upload_photos(session, path, photo_file_list, album_name, args):
     session.headers["Content-type"] = "application/octet-stream"
     session.headers["X-Goog-Upload-Protocol"] = "raw"
     for photo_file_name in tqdm(photo_file_list, desc='Files', leave=False):
-        filename, extention = os.path.splitext(photo_file_name)
-        if extention[1:].lower() in args.extentions:
+        filename, extension = os.path.splitext(photo_file_name)
+        if extension[1:].lower() in args.extensions:
 
             logging.info('Path: {}, file: {}'.format(path, photo_file_name))
+            REPORT[album_name] += 1
         else:
-            logging.info('SKIP: {}, file: {}, because extention: {}'.format(path, photo_file_name, extention))
+            logging.info('SKIP: {}, file: {}, because extension: {}'.format(path, photo_file_name, extension))
             continue
         if args.dry_run:
-            sleep(0.1)
+            # sleep(0.1)
             continue
 
         try:
@@ -238,6 +243,10 @@ def main(args):
         logging.info('Root: {}'.format(path))
         if files:
             _, album_name = os.path.split(path)
+            if album_name in args.excludes:
+                logging.info('SKIP album name: {}'.format(album_name))
+                continue
+
             logging.info('Album name: {}'.format(album_name))
             upload_photos(session, path, files, album_name, args)
 
@@ -247,6 +256,12 @@ def main(args):
     for a in getAlbums(session):
         print(
             "{:<60} | {:>8} | {} ".format(a["title"], a.get("mediaItemsCount", "0"), str(a.get("isWriteable", False))))
+
+
+def print_report():
+    print('*' * 60)
+    for k in sorted(REPORT.keys()):
+        print('{:<60}: {:>8}'.format(k, REPORT[k]))
 
 
 if __name__ == '__main__':
@@ -261,5 +276,11 @@ if __name__ == '__main__':
                         # filename=args.log_file,
                         level=logging.DEBUG,
                         handlers=[tqdm_handler])
-    main(args)
+    try:
+        main(args)
+    except KeyboardInterrupt as e:
+        logging.debug('Ctrl-C pressed')
+        exit(1)
+    finally:
+        print_report()
     logging.info('Done.')
