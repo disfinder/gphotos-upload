@@ -23,26 +23,22 @@ def parse_args(arg_input=None):
     parser = argparse.ArgumentParser(description='Upload photos to Google Photos.')
     parser.add_argument('--auth ', metavar='auth_file', dest='auth_file',
                         help='file for reading/storing user authentication tokens')
-    parser.add_argument('--album', metavar='album_name', dest='album_name',
-                        help='name of photo album to create (if it doesn\'t exist). Any uploaded photos will be added to this album.')
-    parser.add_argument('--log', metavar='log_file', dest='log_file',
-                        help='name of output file for log messages')
-    parser.add_argument('photos', metavar='photo', type=str, nargs='*',
-                        help='filename of a photo to upload')
+    # parser.add_argument('--album', metavar='album_name', dest='album_name',
+    #                     help='name of photo album to create (if it doesn\'t exist). Any uploaded photos will be added to this album.')
+    # parser.add_argument('--log', metavar='log_file', dest='log_file',
+    #                     help='name of output file for log messages')
+    parser.add_argument('root_dir', metavar='root_dir',
+                        help='Root directory with subfolders to process.')
     return parser.parse_args(arg_input)
 
 
 def auth(scopes):
-    flow = InstalledAppFlow.from_client_secrets_file(
-        'client_id.json',
-        scopes=scopes)
-
+    flow = InstalledAppFlow.from_client_secrets_file('client_id.json', scopes=scopes)
     credentials = flow.run_local_server(host='localhost',
                                         port=8080,
                                         authorization_prompt_message="",
                                         success_message='The auth flow is complete; you may close this window.',
                                         open_browser=True)
-
     return credentials
 
 
@@ -201,6 +197,21 @@ def upload_photos(session, photo_file_list, album_name):
 
 
 def main(args):
+    root_dir = os.path.expanduser(args.root_dir)
+
+    logging.debug('Expand: {}'.format(os.path.expanduser(root_dir)))
+    logging.debug('Abs path: {}'.format(os.path.abspath(root_dir)))
+
+    filecounter = 0
+    for _ in os.walk(args.root_dir):
+        filecounter += 1
+
+    for root, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs'):
+        logging.debug('Root: {}'.format(root))
+
+        if files:
+            logging.debug('some files')
+    return
     session = get_authorized_session(args.auth_file)
 
     upload_photos(session, args.photos, args.album_name)
