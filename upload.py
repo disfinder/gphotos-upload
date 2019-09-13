@@ -31,10 +31,11 @@ def parse_args(arg_input=None):
     file_group.add_argument('root_dir', metavar='root_dir',
                             help='Root directory with subfolders to process.')
     file_group.add_argument('-t', '--extension', dest='extensions', required=False, action='append',
-                            default=['jpg', 'mp4'],
+                            default=['jpg', 'jpeg', 'mp4', 'avi'],
                             help='Specify extension to proceed, other will skipped. Case-insensitive. Can be repeated.')
     file_group.add_argument('-e', '--exclude', dest='excludes', required=False, action='append',
-                            default=['.thumbnails', '.picasaoriginals'],
+                            # default=['.thumbnails', '.picasaoriginals'],
+                            default=['.thumbnails',],
                             help='Specify folders to exclude')
 
     parser.add_argument('--auth ', metavar='auth_file', dest='auth_file', default='client_id.json',
@@ -52,8 +53,8 @@ def parse_args(arg_input=None):
     return parser.parse_args(arg_input)
 
 
-def auth(scopes):
-    flow = InstalledAppFlow.from_client_secrets_file('client_id.json', scopes=scopes)
+def auth(scopes, args):
+    flow = InstalledAppFlow.from_client_secrets_file(args.auth_file, scopes=scopes)
     credentials = flow.run_local_server(host='localhost',
                                         port=8080,
                                         authorization_prompt_message="",
@@ -77,7 +78,7 @@ def get_authorized_session(auth_token_file):
             logging.debug("Error loading auth tokens - Incorrect format")
 
     if not cred:
-        cred = auth(scopes)
+        cred = auth(scopes, args)
 
     session = AuthorizedSession(cred)
 
@@ -245,20 +246,27 @@ def main(args):
     for path, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs', leave=False):
         logging.info('Root: {}'.format(path))
         if files:
-            _, album_name = os.path.split(path)
+            # _, album_name = os.path.split(path)
+            album_name=path.rpartition(os.path.commonpath([root_dir, path]))[2][1:]
+
             if album_name in args.excludes:
                 logging.info('SKIP album name: {}'.format(album_name))
+                continue
+            if any(exclude in path for exclude in args.excludes):
+                # for exclude in args.excludes:
+                #     if exclude in path:
+                logging.info('SKIP PATH: {}'.format(path))
                 continue
 
             logging.info('Album name: {}'.format(album_name))
             upload_photos(session, path, files, album_name, args)
-
-    # As a quick status check, dump the aglbums and their key attributes
+    # As a quick status check, dump the albums and their key attributes
+    print('=' * 70)
     print("{:<60} | {:>8} | {} ".format("PHOTO ALBUM", "# PHOTOS", "IS WRITEABLE?"))
-
     for a in getAlbums(session):
         print(
-            "{:<60} | {:>8} | {} ".format(a["title"], a.get("mediaItemsCount", "0"), str(a.get("isWriteable", False))))
+            "{:<60} | {:>8} | {} ".format(a.get("title", a['id']), a.get("mediaItemsCount", "0"),
+                                          str(a.get("isWriteable", False))))
 
 
 def print_report():
@@ -281,9 +289,9 @@ if __name__ == '__main__':
                         handlers=[tqdm_handler])
     try:
         main(args)
+        logging.info('Done.')
     except KeyboardInterrupt as e:
         logging.debug('Ctrl-C pressed')
         exit(1)
     finally:
         print_report()
-    logging.info('Done.')
