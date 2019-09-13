@@ -35,7 +35,7 @@ def parse_args(arg_input=None):
                             help='Specify extension to proceed, other will skipped. Case-insensitive. Can be repeated.')
     file_group.add_argument('-e', '--exclude', dest='excludes', required=False, action='append',
                             # default=['.thumbnails', '.picasaoriginals'],
-                            default=['.thumbnails',],
+                            default=['.thumbnails', ],
                             help='Specify folders to exclude')
 
     parser.add_argument('--auth ', metavar='auth_file', dest='auth_file', default='client_id.json',
@@ -247,7 +247,7 @@ def main(args):
         logging.info('Root: {}'.format(path))
         if files:
             # _, album_name = os.path.split(path)
-            album_name=path.rpartition(os.path.commonpath([root_dir, path]))[2][1:]
+            album_name = path.rpartition(os.path.commonpath([root_dir, path]))[2][1:]
 
             if album_name in args.excludes:
                 logging.info('SKIP album name: {}'.format(album_name))
