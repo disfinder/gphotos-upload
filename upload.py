@@ -25,6 +25,13 @@ def parse_args(arg_input=None):
                         help='file for reading/storing user authentication tokens')
     parser.add_argument('root_dir', metavar='root_dir',
                         help='Root directory with subfolders to process.')
+
+    parser.add_argument('-v', '--verbose', action='count', default=0, help='verbosity level, up to -vvv')
+    # group_common.add_argument('--no-progress', action='store_true', dest='progressbar_disabled',
+    #                           help='Progressbar disabled.')
+    # group_common.add_argument('-fl', '--filename-log', dest='filename_log', metavar='stderr.log',
+    #                           default=None, help='File with additional logging.')
+
     return parser.parse_args(arg_input)
 
 
@@ -211,7 +218,6 @@ def main(args):
         exit(0)
 
     logging.debug('Creating session for upload...')
-    session=None
     session = get_authorized_session(args.auth_file)
 
     for root, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs'):
@@ -221,11 +227,7 @@ def main(args):
             logging.debug('Album name: {}'.format(album_name))
             upload_photos(session, root, files, album_name)
 
-    return
-
-
     # As a quick status check, dump the aglbums and their key attributes
-
     print("{:<50} | {:>8} | {} ".format("PHOTO ALBUM", "# PHOTOS", "IS WRITEABLE?"))
 
     for a in getAlbums(session):
@@ -237,9 +239,13 @@ if __name__ == '__main__':
     args = parse_args()
 
     tqdm_handler = TqdmHandler()
-    tqdm_handler.setLevel('DEBUG')
+    levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+    log_level = levels[min(len(levels) - 1, args.verbose)]  # capped to number of levels
+
+    tqdm_handler.setLevel(log_level)
     logging.basicConfig(format='%(asctime)s - %(levelname)8s - %(name)s - %(message)s',
                         # filename=args.log_file,
                         level=logging.DEBUG,
                         handlers=[tqdm_handler])
     main(args)
+    logging.info('Done.')
