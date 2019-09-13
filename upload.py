@@ -21,13 +21,9 @@ class TqdmHandler(logging.StreamHandler):
 
 def parse_args(arg_input=None):
     parser = argparse.ArgumentParser(description='Upload photos to Google Photos.')
-    parser.add_argument('--auth ', metavar='auth_file', dest='auth_file',
+    parser.add_argument('--auth ', metavar='auth_file', dest='auth_file', default='client_id.json',
                         help='file for reading/storing user authentication tokens')
-    # parser.add_argument('--album', metavar='album_name', dest='album_name',
-    #                     help='name of photo album to create (if it doesn\'t exist). Any uploaded photos will be added to this album.')
-    # parser.add_argument('--log', metavar='log_file', dest='log_file',
-    #                     help='name of output file for log messages')
-    parser.add_argument('root_dir', metavar='root_dir',
+g    parser.add_argument('root_dir', metavar='root_dir',
                         help='Root directory with subfolders to process.')
     return parser.parse_args(arg_input)
 
@@ -203,18 +199,26 @@ def main(args):
     logging.debug('Abs path: {}'.format(os.path.abspath(root_dir)))
 
     filecounter = 0
-    for _ in os.walk(args.root_dir):
+    for _ in os.walk(root_dir):
         filecounter += 1
+    if filecounter==0:
+        logging.warning('No files to upload.')
+        exit(0)
+
+    logging.debug('Creating session for upload...')
+    session = get_authorized_session(args.auth_file)
 
     for root, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs'):
         logging.debug('Root: {}'.format(root))
-
         if files:
+            _, album_name = os.path.split(root)
+            logging.debug('Album name: {}'.format(album_name))
+
+            # upload_photos(session, files, args.album_name)
+
             logging.debug('some files')
     return
-    session = get_authorized_session(args.auth_file)
 
-    upload_photos(session, args.photos, args.album_name)
 
     # As a quick status check, dump the aglbums and their key attributes
 
