@@ -27,6 +27,9 @@ def parse_args(arg_input=None):
                         help='Root directory with subfolders to process.')
 
     parser.add_argument('-v', '--verbose', action='count', default=0, help='verbosity level, up to -vvv')
+    parser.add_argument('-n', '--dry-run', dest='dry_run', required=False, action='store_true',
+                             help='not make actual changes, just dry-run')
+
     # group_common.add_argument('--no-progress', action='store_true', dest='progressbar_disabled',
     #                           help='Progressbar disabled.')
     # group_common.add_argument('-fl', '--filename-log', dest='filename_log', metavar='stderr.log',
@@ -140,22 +143,21 @@ def create_or_retrieve_album(session, album_title):
         return None
 
 
-def upload_photos(session, path, photo_file_list, album_name):
-    # return
-    # for photo_file_name in tqdm(photo_file_list, desc='Files'):
-    #     logging.debug('Album: {} \tFile: {}'.format(album_name,photo_file_name))
-    # return
-
-    album_id = create_or_retrieve_album(session, album_name) if album_name else None
-
-    # interrupt upload if an upload was requested but could not be created
-    if album_name and not album_id:
-        return
+def upload_photos(session, path, photo_file_list, album_name, dry_run):
+    if not dry_run:
+        album_id = create_or_retrieve_album(session, album_name) if album_name else None
+        # interrupt upload if an upload was requested but could not be created
+        if album_name and not album_id:
+            return
 
     session.headers["Content-type"] = "application/octet-stream"
     session.headers["X-Goog-Upload-Protocol"] = "raw"
 
-    for photo_file_name in tqdm(photo_file_list, desc='Files'):
+    for photo_file_name in tqdm(photo_file_list, desc='Files', leave=False):
+        logging.info('Path: {}, file: {}'.format(path, photo_file_name))
+        if dry_run:
+            sleep(0.5)
+            continue
 
         try:
             photo_file = open("{}/{}".format(path,photo_file_name), mode='rb')
@@ -207,8 +209,8 @@ def upload_photos(session, path, photo_file_list, album_name):
 def main(args):
     root_dir = os.path.expanduser(args.root_dir)
 
-    logging.debug('Expand: {}'.format(os.path.expanduser(root_dir)))
-    logging.debug('Abs path: {}'.format(os.path.abspath(root_dir)))
+    logging.info('Expand: {}'.format(os.path.expanduser(root_dir)))
+    logging.info('Abs path: {}'.format(os.path.abspath(root_dir)))
 
     filecounter = 0
     for _ in os.walk(root_dir):
@@ -217,22 +219,23 @@ def main(args):
         logging.warning('No files to upload.')
         exit(0)
 
-    logging.debug('Creating session for upload...')
+    logging.info('Creating session for upload...')
     session = get_authorized_session(args.auth_file)
 
-    for root, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs'):
-        logging.debug('Root: {}'.format(root))
+    for path, subdirs, files in tqdm(os.walk(root_dir), total=filecounter, desc='Dirs', leave=False):
+        logging.info('Root: {}'.format(path))
         if files:
-            _, album_name = os.path.split(root)
-            logging.debug('Album name: {}'.format(album_name))
-            upload_photos(session, root, files, album_name)
+            _, album_name = os.path.split(path)
+            logging.info('Album name: {}'.format(album_name))
+            upload_photos(session, path, files, album_name, args.dry_run)
+
 
     # As a quick status check, dump the aglbums and their key attributes
-    print("{:<50} | {:>8} | {} ".format("PHOTO ALBUM", "# PHOTOS", "IS WRITEABLE?"))
+    print("{:<60} | {:>8} | {} ".format("PHOTO ALBUM", "# PHOTOS", "IS WRITEABLE?"))
 
     for a in getAlbums(session):
         print(
-            "{:<50} | {:>8} | {} ".format(a["title"], a.get("mediaItemsCount", "0"), str(a.get("isWriteable", False))))
+            "{:<60} | {:>8} | {} ".format(a["title"], a.get("mediaItemsCount", "0"), str(a.get("isWriteable", False))))
 
 
 if __name__ == '__main__':
