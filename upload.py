@@ -49,8 +49,8 @@ def parse_args(arg_input=None):
 
     # group_common.add_argument('--no-progress', action='store_true', dest='progressbar_disabled',
     #                           help='Progressbar disabled.')
-    # group_common.add_argument('-fl', '--filename-log', dest='filename_log', metavar='stderr.log',
-    #                           default=None, help='File with additional logging.')
+    parser.add_argument('-fl', '--filename-log', dest='filename_log', metavar='stderr.log',
+                        default=None, help='File with additional logging.')
 
     return parser.parse_args(arg_input)
 
@@ -290,10 +290,17 @@ if __name__ == '__main__':
     log_level = levels[min(len(levels) - 1, args.verbose)]  # capped to number of levels
 
     tqdm_handler.setLevel(log_level)
+    handlers = [tqdm_handler]
+
+    if args.filename_log:
+        filelandler = logging.FileHandler(args.filename_log)
+        filelandler.setLevel(log_level)
+
+        handlers.append(filelandler)
     logging.basicConfig(format='%(asctime)s - %(levelname)8s - %(name)s - %(message)s',
                         # filename=args.log_file,
                         level=logging.DEBUG,
-                        handlers=[tqdm_handler])
+                        handlers=handlers)
     try:
         main(args)
         logging.info('Done.')
